@@ -1,0 +1,10 @@
+settime0
+========
+
+settime0 is a wrapper for ntpdate(8). A symlink named settime pointing to the most recent version of settime should be placed in a directory that is in the PATH.
+
+* read the list of NTP servers and their stats from the config file
+* chose the NTP server(s) to query
+* query the chosen NTP server(s) using ntpdate(8)
+* update the stats
+
