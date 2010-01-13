@@ -1,0 +1,360 @@
+#! /usr/local/bin/perl
+# settime
+# by Brian P. Giroux
+#
+#$ DATA STRUCTURES
+#$
+#$ $ntpdate => Path, filename, and command line options of ntpdate command.
+#$ $config_file => Path and filename of YAML formated config and data file.
+#$ $test => Set to true when testing (debugging).
+#$ $options => Reference to annonymous array read from document 1 of $config_file.
+#$ $ntpsites => Reference to annonymous array read from document 2 of $config_file.
+#$ @picklist => This array contains a list of all the "candidates" to choose from. Each candidate is identified by its index number in the annonymous array refered to by $ntpsites. As candidates are removed from eligibility (either because they were identified as an unwanted candidate or because they have been chosen and must be removed to avoid duplication), their @picklist element can be removed without afecting the $ntpsites array.
+#$ @chosen => This array contains a list of the chosen candidates. As with the @picklist array, this array identifies the chosen candidates by their index numbers in the annonymous array refered to by $ntpsites.
+#$
+
+use strict;
+use warnings;
+use YAML qw'LoadFile Dump';
+use List::Util qw(shuffle max);
+
+#- Set the default options
+#-
+my $ntpdate     = "/usr/local/bin/ntpdate -q ";
+my $config_file = 'settime.yml';
+my $test        = 1;
+
+my $counter;    # a general purpose counter
+
+#- Read the config file
+#-
+my ( $options, $ntpsites ) = LoadFile($config_file);
+
+#- Choose the sites to query
+#-
+#-
+
+#- Build the initial list
+#-
+my @picklist;    # array containing ntp sites to choose from
+my @chosen;      # array containing chosen ntp sites
+$#picklist = $#$ntpsites;
+for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+    $picklist[$i] = $i;
+}
+
+#- Remove any unwanted sites from the list (I need to change this from removing specifically NRC sites to removing sites that math a particular RegEx.
+#-
+printpicklist("Before Blacklist") if $test;
+for ( my $i = $#$ntpsites ; $i >= 0 ; $i-- ) {
+    if ( exists $ntpsites->[$i]{institution}
+        && defined $ntpsites->[$i]{institution} )
+    {
+        splice( @picklist, $i, 1 )
+          if ( $ntpsites->[$i]{institution} =~ /microsoft/i );
+    }
+}
+
+printpicklist("After Blacklist") if $test;
+
+#- Choose the NRC sites (I need to change this from choosing specifically NRC sites to choosing sites that match a particular RegEx.
+#-
+for ( my $i = $#picklist ; $i >= 0 ; $i-- ) {
+    if ( exists $ntpsites->[$i]{institution}
+        && defined $ntpsites->[$i]{institution} )
+    {
+        push( @chosen, splice( @picklist, $i, 1 ) )
+          if ( $ntpsites->[$i]{institution} =~ /nrc/i );
+    }
+}
+
+printpicklist("After NRC") if $test;
+printchosen("After NRC")   if $test;
+
+#- Choose the least often picked (inverse weighted random)
+#-
+$counter = 0;
+$counter = $options->{least_picked}
+  if ( exists $options->{least_picked} && defined $options->{least_picked} );
+while ( $counter > 0 ) {
+    my @tickets;
+
+    #- read each candidate's 'pick' stats
+    for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+        if ( exists $ntpsites->[ $picklist[$i] ]{pick}
+            && defined $ntpsites->[ $picklist[$i] ]{pick} )
+        {
+            $tickets[$i] = $ntpsites->[ $picklist[$i] ]{pick};
+        }
+        else { $tickets[$i] = 0 }
+    }
+
+    #- inverse the ticket quantities
+    @tickets = inverse_weight(@tickets);
+    my $zero = 0;    # a 'zero' flag
+
+    #- search for a ticket with a 0 weight
+    foreach my $t (@tickets) {
+        if ( $t == 0 ) { $zero = 1; last; }
+    }
+    if ($zero) {
+
+        #- if anyone has a 0 weight, give everyone an additional ticket
+        foreach my $t (@tickets) { $t++; }
+    }
+    push( @chosen, splice( @picklist, wrand( buy_tickets(@tickets) ), 1 ) );
+
+    $counter--;
+}
+
+printpicklist("After least picked") if $test;
+printchosen("After least picked")   if $test;
+
+#- Choose sites with the most hits (weighted random)
+#-
+$counter = 0;
+$counter = $options->{top_success}
+  if ( exists $options->{top_success} && defined $options->{top_success} );
+while ( $counter > 0 ) {
+    my @tickets;
+
+    #- read each candidate's 'success' stats
+    for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+        if ( exists $ntpsites->[ $picklist[$i] ]{success}
+            && defined $ntpsites->[ $picklist[$i] ]{success} )
+        {
+            $tickets[$i] = $ntpsites->[ $picklist[$i] ]{success};
+        }
+        else { $tickets[$i] = 0; }
+    }
+    my $zero = 0;    # a 'zero' flag
+
+    #- search for a ticket with a 0 weight
+    foreach my $t (@tickets) {
+        if ( $t == 0 ) { $zero = 1; last; }
+    }
+    if ($zero) {
+
+        #- if anyone has a 0 weight, give everyone an additional ticket
+        foreach my $t (@tickets) { $t++; }
+    }
+
+    push( @chosen, splice( @picklist, wrand( buy_tickets(@tickets) ), 1 ) );
+    $counter--;
+}
+
+printpicklist("After most hits") if $test;
+printchosen("After most hits")   if $test;
+
+#- Choose sites with best hit/pick ratio (weighted random)
+#-
+$counter = 0;
+$counter = $options->{top_success_choose_ratio}
+  if ( exists $options->{top_success_choose_ratio}
+    && defined $options->{top_success_choose_ratio} );
+while ( $counter > 0 ) {
+    my @tickets;
+
+    #- read each candidate's 'success' stats
+    for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+        if (   exists $ntpsites->[ $picklist[$i] ]{success}
+            && defined $ntpsites->[ $picklist[$i] ]{success}
+            && exists $ntpsites->[ $picklist[$i] ]{pick}
+            && defined $ntpsites->[ $picklist[$i] ]{pick}
+            && $ntpsites->[ $picklist[$i] ]{pick} > 0 )
+        {
+            $tickets[$i] = int(
+                (
+                    $ntpsites->[ $picklist[$i] ]{success} /
+                      $ntpsites->[ $picklist[$i] ]{pick}
+                ) * 1000
+            );
+        }
+        else { $tickets[$i] = 0 }
+    }
+    my $zero = 0;    # a 'zero' flag
+
+    #- search for a ticket with a 0 weight
+    foreach my $t (@tickets) {
+        if ( $t == 0 ) { $zero = 1; last; }
+    }
+    if ($zero) {
+
+        #- if anyone has a 0 weight, give everyone an additional ticket
+        foreach my $t (@tickets) { $t++; }
+    }
+
+    push( @chosen, splice( @picklist, wrand( buy_tickets(@tickets) ), 1 ) );
+    $counter--;
+}
+
+printpicklist("After best ratio") if $test;
+printchosen("After best ratio")   if $test;
+
+#- Shuffle the chosen
+#-
+@chosen = shuffle(@chosen);
+
+printchosen("After shuffle") if $test;
+
+#- Simulate a success
+#-
+
+$ntpsites->[ $chosen[ int( rand(@chosen) ) ] ]{success}++;
+
+#- Update the stats
+#-
+$options->{iterations}++;
+for ( my $i = 0 ; $i <= $#chosen ; $i++ ) {
+    $ntpsites->[ $chosen[$i] ]{pick}++;
+}
+
+#- Output the stats to screen (for testing)
+#-
+if ($test) {
+    for ( my $i = 0 ; $i <= $#$ntpsites ; $i++ ) {
+        print "$ntpsites->[$i]{url} <$ntpsites->[$i]{ipaddress}> (";
+        if ( exists $ntpsites->[$i]{success}
+            && defined $ntpsites->[$i]{success} )
+        {
+            print $ntpsites->[$i]{success};
+        }
+        else {
+            print "??";
+        }
+        print "/";
+        if ( exists $ntpsites->[$i]{pick}
+            && defined $ntpsites->[$i]{pick} )
+        {
+            print $ntpsites->[$i]{pick};
+        }
+        else {
+            print "??";
+        }
+        print ")\n";
+    }
+}
+
+#- Write stats to file
+# From Perl Cookbook (by Tom Christiansen and Nathan Torkington)
+# Recipe 7.17
+#-
+open( FH, "+<", $config_file ) or die "can't read $config_file: $!";
+seek( FH, 0, 0 ) or die "can't seek to start of $config_file: $!";
+print FH Dump( $options, $ntpsites ) or die "can't write to $config_file: $!";
+truncate( FH, tell(FH) ) or die "can't truncate $config_file: $!";
+close(FH) or die "can't close $config_file: $!";
+
+############################################################################
+sub ticket_qty {
+############################################################################
+    my @tickets;
+    $#tickets = $#picklist;
+    for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+        if ( exists $ntpsites->[ $picklist[$i] ]{success}
+            && defined $ntpsites->[ $picklist[$i] ]{success} )
+        {
+
+    #            if ( $i > 0 ) {
+    #                $lotto[$i] =
+    #                  $lotto[ $i - 1 ] + $ntpsites->[ $picklist[$i] ]{success};
+    #            }
+    #            else { $lotto[$i] = $ntpsites->[ $picklist[$i] ]{success} - 1 }
+            $tickets[$i] = $ntpsites->[ $picklist[$i] ]{success};
+        }
+
+        #        else { $lotto[$i] = $lotto[ $i - 1 ]; }
+    }
+    return @tickets;
+
+    #
+    #    if ($test) {
+    #        for ( my $c = 0 ; $c <= $#lotto ; $c++ ) {
+    #            print "\$lotto[$c] = $lotto[$c]\n";
+    #        }
+    #        print "\n";
+    #    }
+}
+
+# Output @chosen (for testing)
+#
+############################################################################
+sub printchosen {
+############################################################################
+    my ($msg) = @_;
+    print "\@chosen : $msg\n";
+    foreach ( my $r = 0 ; $r <= $#chosen ; $r++ ) {
+        print "item $r =-> $chosen[$r]\t"
+          . "$ntpsites->[$chosen[$r]]{url} "
+          . "($ntpsites->[$chosen[$r]]{ipaddress})\n";
+    }
+    print "\n\n";
+}
+
+# Output @picklist (for testing)
+#
+############################################################################
+sub printpicklist {
+############################################################################
+    my ($msg) = @_;
+    print "\@picklist : $msg\n";
+    foreach ( my $r = 0 ; $r <= $#picklist ; $r++ ) {
+        print "item $r =-> $picklist[$r]\t"
+          . "$ntpsites->[$picklist[$r]]{url}\n";
+    }
+    print "\n\n";
+}
+
+############################################################################
+sub inverse_weight {
+############################################################################
+    my $maxpicks = max(@_);
+    my @tickets;
+    for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
+        $tickets[$i] = $maxpicks - $_[$i];
+    }
+    return @tickets;
+}
+
+# buy_tickets - converts a list of ticket quantities into a list of ticket offsets
+# input : a list of ticket quantities
+# output: a list of ticket offsets
+############################################################################
+sub buy_tickets {
+############################################################################
+    my @offsets;
+    $#offsets = $#_;
+    $offsets[0] = $_[0] - 1;
+    for ( my $i = 1 ; $i <= $#_ ; $i++ ) {
+        $offsets[$i] = $offsets[ $i - 1 ] + $_[$i];
+    }
+    return (@offsets);
+}
+
+# wrand - returns a weighted random number
+# input : a list of 'ticket' offsets
+# output: the number of the ticket holder
+############################################################################
+sub wrand {
+############################################################################
+    my $winticket = int( rand( $_[$#_] + 1 ) );
+    my $winner;
+    my $i = 0;
+    while ( !defined $winner ) {
+        $winner = $i if $winticket <= $_[$i];
+        $i++;
+    }
+    return ($winner);
+}
+
+__END__
+
+=head1 NAME
+
+settime - Wrapper for C<ntpdate> (to sync your computer's date and time with an NTP server.
+
+
+
+=cut
+
+
