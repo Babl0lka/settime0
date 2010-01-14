@@ -3,8 +3,50 @@ settime0
 
 settime0 is a wrapper for ntpdate(8). A symlink named settime pointing to the most recent version of settime should be placed in a directory that is in the PATH.
 
-* read the list of NTP servers and their stats from the config file
-* chose the NTP server(s) to query
-* query the chosen NTP server(s) using ntpdate(8)
-* update the stats
+
+PROCEDURE
+---------
+
+- Set the default options
+-
+- Read the config file
+-
+- Choose the sites to query
+-
+-
+- Build the initial list
+-
+- Remove any unwanted sites from the list (I need to change this from removing specifically NRC sites to removing sites that math a particular RegEx.
+-
+- Choose the NRC sites (I need to change this from choosing specifically NRC sites to choosing sites that match a particular RegEx.
+-
+- Choose the least often picked (inverse weighted random)
+-
+    - read each candidate's 'pick' stats
+    - inverse the ticket quantities
+        - if anyone has a 0 weight, give everyone an additional ticket
+- Choose sites with the most hits (weighted random)
+-
+    - read each candidate's 'success' stats
+        - if anyone has a 0 weight, give everyone an additional ticket
+- Choose sites with best hit/pick ratio (weighted random)
+-
+    - read each candidate's 'success' stats
+        - if anyone has a 0 weight, give everyone an additional ticket
+- Shuffle the chosen
+-
+- Simulate a success
+-
+- Update the stats
+-
+- Output the stats to screen (for testing)
+-
+- Write stats to file
+-
+
+
+TODO
+----
+
+* change the formula that calculates the number of tickets when reading the best hit/pick ratio to multiply by a different number (perhaps the reciprical of something...)
 

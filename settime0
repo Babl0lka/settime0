@@ -16,7 +16,7 @@
 use strict;
 use warnings;
 use YAML qw'LoadFile Dump';
-use List::Util qw(shuffle max);
+use List::Util qw(shuffle max min);
 
 #- Set the default options
 #-
@@ -91,17 +91,13 @@ while ( $counter > 0 ) {
 
     #- inverse the ticket quantities
     @tickets = inverse_weight(@tickets);
-    my $zero = 0;    # a 'zero' flag
 
-    #- search for a ticket with a 0 weight
-    foreach my $t (@tickets) {
-        if ( $t == 0 ) { $zero = 1; last; }
-    }
-    if ($zero) {
+    if ( min(@tickets) < 1 ) {
 
         #- if anyone has a 0 weight, give everyone an additional ticket
         foreach my $t (@tickets) { $t++; }
     }
+
     push( @chosen, splice( @picklist, wrand( buy_tickets(@tickets) ), 1 ) );
 
     $counter--;
@@ -127,13 +123,8 @@ while ( $counter > 0 ) {
         }
         else { $tickets[$i] = 0; }
     }
-    my $zero = 0;    # a 'zero' flag
 
-    #- search for a ticket with a 0 weight
-    foreach my $t (@tickets) {
-        if ( $t == 0 ) { $zero = 1; last; }
-    }
-    if ($zero) {
+    if ( min(@tickets) < 1 ) {
 
         #- if anyone has a 0 weight, give everyone an additional ticket
         foreach my $t (@tickets) { $t++; }
@@ -149,9 +140,9 @@ printchosen("After most hits")   if $test;
 #- Choose sites with best hit/pick ratio (weighted random)
 #-
 $counter = 0;
-$counter = $options->{top_success_choose_ratio}
-  if ( exists $options->{top_success_choose_ratio}
-    && defined $options->{top_success_choose_ratio} );
+$counter = $options->{top_successpick_ratio}
+  if ( exists $options->{top_successpick_ratio}
+    && defined $options->{top_successpick_ratio} );
 while ( $counter > 0 ) {
     my @tickets;
 
@@ -172,13 +163,8 @@ while ( $counter > 0 ) {
         }
         else { $tickets[$i] = 0 }
     }
-    my $zero = 0;    # a 'zero' flag
 
-    #- search for a ticket with a 0 weight
-    foreach my $t (@tickets) {
-        if ( $t == 0 ) { $zero = 1; last; }
-    }
-    if ($zero) {
+    if ( min(@tickets) < 1 ) {
 
         #- if anyone has a 0 weight, give everyone an additional ticket
         foreach my $t (@tickets) { $t++; }
@@ -255,25 +241,12 @@ sub ticket_qty {
             && defined $ntpsites->[ $picklist[$i] ]{success} )
         {
 
-    #            if ( $i > 0 ) {
-    #                $lotto[$i] =
-    #                  $lotto[ $i - 1 ] + $ntpsites->[ $picklist[$i] ]{success};
-    #            }
-    #            else { $lotto[$i] = $ntpsites->[ $picklist[$i] ]{success} - 1 }
             $tickets[$i] = $ntpsites->[ $picklist[$i] ]{success};
         }
 
-        #        else { $lotto[$i] = $lotto[ $i - 1 ]; }
     }
     return @tickets;
 
-    #
-    #    if ($test) {
-    #        for ( my $c = 0 ; $c <= $#lotto ; $c++ ) {
-    #            print "\$lotto[$c] = $lotto[$c]\n";
-    #        }
-    #        print "\n";
-    #    }
 }
 
 # Output @chosen (for testing)

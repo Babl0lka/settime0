@@ -1,179 +1,133 @@
 ---
-blacklist:
-  - institution: microsoft
-institution:
-  microsoft: 0
-  nrc: 2
-iterations: 243
+bwlist:
+  - key: institution
+    qty: 2
+    value: nrc
+  - key: institution
+    qty: 0
+    value: microsoft
+iterations: 0
 least_picked: 2
 top_success: 2
-top_success_choose_ratio: 2
-verision: 0.1.a1
-whitelist:
-  - institution: nrc
-    qty: 99
-bwlist:
-  - key: instituition
-    value: nrc
-    qty: 99
-  - key: institution
-    value: microsoft
-    qty: 0
+top_successpick_ratio: 2
+verision: 0.1
 ---
 - institution: NRC
   ipaddress: 132.246.168.164
-  pick: 243
-  success: 40
   url: time.nrc.ca
 - institution: NRC
   ipaddress: 209.87.233.53
-  pick: 243
-  success: 29
   url: time.chu.nrc.ca
 - ipaddress: 200.50.25.62
   location:
     city: Bayamon
     country: Puerto Rico
-  pick: 57
   status: Ok
-  success: 7
   url: nist1.uccaribe.edu
 - ipaddress: 64.90.182.55
   location:
     city: New York City
     province: NY
-  pick: 76
   status: Recommended for new users
-  success: 10
   url: nist1-ny.ustiming.org
 - authority: NIST
   ipaddress: 129.6.15.28
   location:
     city: Gaithersburg
     province: Maryland
-  pick: 69
   status: Ok
-  success: 8
   url: time-a.nist.gov
 - authority: NIST
   ipaddress: 129.6.15.29
   location:
     city: Gaithersburg
     province: Maryland
-  pick: 105
   status: Ok
-  success: 16
   url: time-b.nist.gov
 - ipaddress: 206.246.118.250
   location:
     city: Alexandria
     province: Virginia
-  pick: 63
   status: Recommended for new users
-  success: 6
   url: nist1-dc.ustiming.org
 - ipaddress: 64.236.96.53
   location:
     city: Reston
     province: Virginia
-  pick: 71
   status: Recommended for new users
-  success: 12
   url: nist1.aol-va.symmetricom.com
 - ipaddress: 68.216.79.113
   location:
     city: Columbia County
     province: Georgia
-  pick: 85
   status: Recommended for new users
-  success: 10
   url: nist1.columbiacountyga.gov
 - ipaddress: 208.66.175.36
   location:
     city: Chicago
     province: Illinois
-  pick: 87
   status: Recommended for new users
-  success: 6
   url: nist1-chi.ustiming.org
 - ipaddress: 173.14.47.149
   location:
     city: Monroe
     province: Michigan
-  pick: 82
   status: Recommended for new users
-  success: 11
   url: nist.expertsmi.com
 - ipaddress: 64.113.32.5
   location:
     city: Southfield
     province: Michigan
-  pick: 34
   status: Recommended for new users
-  success: 1
   url: nist.netservicesgroup.com
 - authority: NIST
   ipaddress: 132.163.4.101
   location:
     city: Boulder
     province: Colorado
-  pick: 45
   status: Ok
-  success: 4
   url: time-a.timefreq.bldrdoc.gov
 - authority: NIST
   ipaddress: 132.163.4.102
   location:
     city: Boulder
     province: Colorado
-  pick: 46
   status: Very busy
-  success: 2
   url: time-b.timefreq.bldrdoc.gov
 - authority: NIST
   ipaddress: 132.163.4.103
   location:
     city: Boulder
     province: Colorado
-  pick: 78
   status: ok
-  success: 10
   url: time-c.timefreq.bldrdoc.gov
 - authority: NCAR
   ipaddress: 192.43.244.18
   location:
     city: Boulder
     province: Colorado
-  pick: 67
   status: Ok
-  success: 8
   url: time.nist.gov
 - institution: University of Colorado
   ipaddress: 128.138.140.44
   location:
     city: Boulder
     province: Colorado
-  pick: 59
   status: ok
-  success: 7
   url: utcnist.colorado.edu
 - institution: University of Colorado
   ipaddress: 128.138.188.172
   location:
     city: Boulder
     province: Colorado
-  pick: 63
   status: Recommended for new users
-  success: 5
   url: utcnist2.colorado.edu
 - authority: LDSBC
   ipaddress: 198.60.73.8
   location:
     city: Salt Lake City
     province: Utah
-  pick: 89
   status: Recommended for new users
-  success: 17
   url: ntp-nist.ldsbc.edu
 - institution: Microsoft
   ipaddress: 131.107.13.100
@@ -186,31 +140,23 @@ bwlist:
   location:
     city: Mountain View
     province: California
-  pick: 79
   status: Recommended for new users
-  success: 13
   url: nist1.aol-ca.symmetricom.com
 - ipaddress: 69.25.96.13
   location:
     city: San Jose
     province: California
-  pick: 69
   status: Recommended for new users
-  success: 10
   url: nist1.symmetricom.com
 - ipaddress: 64.125.78.85
   location:
     city: San Jose
     province: California
-  pick: 70
   status: Recommended for new users
-  success: 6
   url: nist1-sj.ustiming.org
 - ipaddress: 64.147.116.229
   location:
     city: Los Angeles
     province: California
-  pick: 64
   status: Recommended for new users
-  success: 5
   url: nist1-la.ustiming.org
