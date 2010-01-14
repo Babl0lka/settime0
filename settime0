@@ -21,7 +21,7 @@ use List::Util qw(shuffle max min);
 #- Set the default options
 #-
 my $ntpdate     = "/usr/local/bin/ntpdate -q ";
-my $config_file = 'settime.yml';
+my $config_file = '/etc/settime.yml';
 my $test        = 1;
 
 my $counter;    # a general purpose counter
@@ -43,7 +43,7 @@ for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
     $picklist[$i] = $i;
 }
 
-#- Remove any unwanted sites from the list (I need to change this from removing specifically NRC sites to removing sites that math a particular RegEx.
+#- Remove any unwanted sites from the list (I need to change this from removing specifically Microsoft sites to removing sites that math a particular RegEx.
 #-
 printpicklist("Before Blacklist") if $test;
 for ( my $i = $#$ntpsites ; $i >= 0 ; $i-- ) {
