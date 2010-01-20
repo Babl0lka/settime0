@@ -22,7 +22,7 @@ use List::Util qw(shuffle max min);
 #-
 my $ntpdate     = "/usr/local/bin/ntpdate -q ";
 my $config_file = '/etc/settime.yml';
-my $test        = 1;
+my $test        = 0;
 
 my $counter;    # a general purpose counter
 
@@ -38,38 +38,89 @@ my ( $options, $ntpsites ) = LoadFile($config_file);
 #-
 my @picklist;    # array containing ntp sites to choose from
 my @chosen;      # array containing chosen ntp sites
+
 $#picklist = $#$ntpsites;
 for ( my $i = 0 ; $i <= $#picklist ; $i++ ) {
     $picklist[$i] = $i;
 }
 
-#- Remove any unwanted sites from the list (I need to change this from removing specifically Microsoft sites to removing sites that math a particular RegEx.
+printpicklist("Before processing {bwlist}") if $test;
+
+#- Process the 'bwlist' (black list and white list) part of the options document
 #-
-printpicklist("Before Blacklist") if $test;
-for ( my $i = $#$ntpsites ; $i >= 0 ; $i-- ) {
-    if ( exists $ntpsites->[$i]{institution}
-        && defined $ntpsites->[$i]{institution} )
-    {
-        splice( @picklist, $i, 1 )
-          if ( $ntpsites->[$i]{institution} =~ /microsoft/i );
+if ( exists $options->{bwlist} && defined $options->{bwlist} ) {
+    for ( my $i = 0 ; $i <= $#{ $options->{bwlist} } ; $i++ ) {
+        if (   exists $options->{bwlist}[$i]{qty}
+            && defined $options->{bwlist}[$i]{qty}
+            && exists $options->{bwlist}[$i]{key}
+            && defined $options->{bwlist}[$i]{key}
+            && exists $options->{bwlist}[$i]{value}
+            && defined $options->{bwlist}[$i]{value} )
+        {
+            my $k = $options->{bwlist}[$i]{key};
+            my $v = $options->{bwlist}[$i]{value};
+
+            #- if the quantity is 0, blacklist matching sites
+            if ( $options->{bwlist}[$i]{qty} == 0 ) {
+                blacklist(
+                    $options->{bwlist}[$i]{key},
+                    $options->{bwlist}[$i]{value}
+                );
+            }
+
+            #- otherwise, choose the desired quantity of matching sites
+            else {
+
+                #- find the matching sites
+                my @candidates = match_candidates(
+                    $options->{bwlist}[$i]{key},
+                    $options->{bwlist}[$i]{value}
+                );
+                if (@candidates) {
+                    if ( $options->{bwlist}[$i]{qty} < scalar(@candidates) ) {
+
+                        #- if I have more candidates than I want,
+                        #- randomly choose $op..{qty} items
+                        my $winner;
+                        for (
+                            my $c = 0 ;
+                            $c < $options->{bwlist}[$i]{qty} ;
+                            $c++
+                          )
+                        {
+                            $winner =
+                              splice( @candidates,
+                                int( rand( scalar(@candidates) ) ), 1 );
+                            push(
+                                @chosen,
+                                splice(
+                                    @picklist, canfind( $winner, @picklist ),
+                                    1
+                                )
+                            );
+                        }
+                    }
+                    else {
+
+                        #- otherwise, take em all ($match of them)
+                        for ( my $i = $#candidates ; $i >= 0 ; $i-- ) {
+                            push(
+                                @chosen,
+                                splice(
+                                    @picklist,
+                                    canfind( $candidates[$i], @picklist ), 1
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-printpicklist("After Blacklist") if $test;
-
-#- Choose the NRC sites (I need to change this from choosing specifically NRC sites to choosing sites that match a particular RegEx.
-#-
-for ( my $i = $#picklist ; $i >= 0 ; $i-- ) {
-    if ( exists $ntpsites->[$i]{institution}
-        && defined $ntpsites->[$i]{institution} )
-    {
-        push( @chosen, splice( @picklist, $i, 1 ) )
-          if ( $ntpsites->[$i]{institution} =~ /nrc/i );
-    }
-}
-
-printpicklist("After NRC") if $test;
-printchosen("After NRC")   if $test;
+printpicklist("After bwlist") if $test;
+printchosen("After bwlist")   if $test;
 
 #- Choose the least often picked (inverse weighted random)
 #-
@@ -186,7 +237,8 @@ printchosen("After shuffle") if $test;
 #- Simulate a success
 #-
 
-$ntpsites->[ $chosen[ int( rand(@chosen) ) ] ]{success}++;
+my $success = $chosen[ int( rand(@chosen) ) ];
+$ntpsites->[$success]{success}++;
 
 #- Update the stats
 #-
@@ -199,7 +251,7 @@ for ( my $i = 0 ; $i <= $#chosen ; $i++ ) {
 #-
 if ($test) {
     for ( my $i = 0 ; $i <= $#$ntpsites ; $i++ ) {
-        print "$ntpsites->[$i]{url} <$ntpsites->[$i]{ipaddress}> (";
+        print "$i\t$ntpsites->[$i]{url} <$ntpsites->[$i]{ipaddress}> (";
         if ( exists $ntpsites->[$i]{success}
             && defined $ntpsites->[$i]{success} )
         {
@@ -240,13 +292,10 @@ sub ticket_qty {
         if ( exists $ntpsites->[ $picklist[$i] ]{success}
             && defined $ntpsites->[ $picklist[$i] ]{success} )
         {
-
             $tickets[$i] = $ntpsites->[ $picklist[$i] ]{success};
         }
-
     }
     return @tickets;
-
 }
 
 # Output @chosen (for testing)
@@ -279,6 +328,44 @@ sub printpicklist {
 }
 
 ############################################################################
+sub blacklist {
+###########################################################################
+    my ( $k, $v ) = @_;
+    for ( my $i = $#picklist ; $i >= 0 ; $i-- ) {
+        if ( exists $ntpsites->[ $picklist[$i] ]{$k}
+            && defined $ntpsites->[ $picklist[$i] ]{$k} )
+        {
+            splice( @picklist, $i, 1 )
+              if ( $ntpsites->[ $picklist[$i] ]{$k} =~ /$v/i );
+        }
+    }
+}
+
+############################################################################
+sub canfind {
+############################################################################
+    my ( $needle, @haystack ) = @_;
+    for ( my $i = 0 ; $i <= $#haystack ; $i++ ) {
+        return $i if ( $needle == $haystack[$i] );
+    }
+    return undef;
+}
+
+############################################################################
+sub match_candidates {
+############################################################################
+    my ( $k, $v ) = @_;
+    my @candidates;
+    for ( my $i = 0 ; $i < $#picklist ; $i++ ) {
+        push( @candidates, $picklist[$i] )
+          if ( exists $ntpsites->[ $picklist[$i] ]{$k}
+            && defined $ntpsites->[ $picklist[$i] ]{$k}
+            && $ntpsites->[ $picklist[$i] ]{$k} =~ /$v/i );
+    }
+    return (@candidates);
+}
+
+############################################################################
 sub inverse_weight {
 ############################################################################
     my $maxpicks = max(@_);
@@ -289,9 +376,10 @@ sub inverse_weight {
     return @tickets;
 }
 
-# buy_tickets - converts a list of ticket quantities into a list of ticket offsets
-# input : a list of ticket quantities
-# output: a list of ticket offsets
+## buy_tickets - converts a list of ticket quantities into a list of ticket offsets
+## input : a list of ticket quantities
+## output: a list of ticket offsets
+##
 ############################################################################
 sub buy_tickets {
 ############################################################################
@@ -304,9 +392,10 @@ sub buy_tickets {
     return (@offsets);
 }
 
-# wrand - returns a weighted random number
-# input : a list of 'ticket' offsets
-# output: the number of the ticket holder
+## wrand - returns a weighted random number
+## input : a list of 'ticket' offsets
+## output: the number of the ticket holder
+##
 ############################################################################
 sub wrand {
 ############################################################################
